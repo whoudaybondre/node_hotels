@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const person = require('./../models/person');
+const { jwtAuthMidlleware, generateToken } = require('./../jwt');
 
 router.get("/:workType", async(req, res) => {
     try {
@@ -20,7 +21,7 @@ router.get("/:workType", async(req, res) => {
 
 })
 
-router.post('/', async(req, res) => {
+router.post('/signup', async(req, res) => {
     try {
         const data = req.body; //assuming the request body contains the person data
 
@@ -37,7 +38,17 @@ router.post('/', async(req, res) => {
         //save to database
         const response = await newPerson.save();
         console.log('data saved');
-        res.status(200).json(response);
+
+        const payload = {
+            id: response.id,
+            username: response.username
+        }
+        console.log(JSON.stringify(payload));
+
+        const token = generateToken(payload);
+        console.log('token saved :', token);
+
+        res.status(200).json({ response: response, token: token });
 
 
     } catch (err) {
@@ -46,6 +57,41 @@ router.post('/', async(req, res) => {
 
     }
 })
+
+//login route
+router.post('/login', async(req, res) => {
+    try {
+        //extract the username and password
+        const { username, password } = req.body;
+        // console.log(username);
+        // console.log(password);
+
+        //find user by username
+        const user = await person.findOne({ username: username });
+
+        //if user not found and password is wrong
+        if (!user || !(await user.comparePassword(password))) {
+            return res.status(401).json({ error: 'invalid username and password' });
+        }
+
+        //gnerate token
+        const payload = {
+            id: user.id,
+            username: user.username
+        }
+
+        const token = generateToken(payload);
+
+        //return token as response
+        res.json({ token });
+
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ error: 'Internal Server Error' })
+    }
+})
+
+
 
 router.get('/', async(req, res) => {
     try {
